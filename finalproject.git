@@ -1,0 +1,169 @@
+import csv
+import os
+
+# ---- Auto-generate input files ---- #
+# Sample data for 10 students
+students_data = [
+    ['First', 'Last', 'Math', 'English', 'History', 'Science'],
+    ['Alexis', 'Thoonkuzhy', 95, 89, 92, 88],
+    ['Jamie', 'Smith', 82, 76, 90, 85],
+    ['Chris', 'Taylor', 65, 70, 68, 72],
+    ['Jordan', 'Lee', 88, 93, 85, 91],
+    ['Morgan', 'Chen', 77, 79, 80, 75],
+    ['Riley', 'Patel', 92, 94, 90, 96],
+    ['Casey', 'Nguyen', 70, 65, 60, 72],
+    ['Taylor', 'Jones', 98, 100, 96, 97],
+    ['Skylar', 'Brown', 59, 62, 58, 61],
+    ['Avery', 'Kim', 85, 84, 87, 83],
+]
+
+# Write grades.csv
+with open('grades.csv', 'w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerows(students_data)
+
+# Sample attendance data
+attendance_lines = []
+for student in students_data[1:]:
+    full_name = f"{student[0]} {student[1]}"
+    attendance_lines += [f"{full_name}: present" for _ in range(80)]  # 80% attendance
+    attendance_lines += [f"{full_name}: absent" for _ in range(20)]  # 20% absent
+
+# Write attendance.txt
+with open('attendance.txt', 'w') as file:
+    for line in attendance_lines:
+        file.write(line + '\n')
+
+# Sample assignments data (weights for GPA prediction)
+assignments_data = [
+    ['Assignment', 'Math', 'English', 'History', 'Science'],
+    ['Test 1', 90, 85, 88, 92],
+    ['Test 2', 80, 78, 85, 89],
+    ['Quiz 1', 95, 90, 92, 87],
+    ['Quiz 2', 88, 84, 87, 90],
+]
+
+# Write assignments.csv
+with open('assignments.csv', 'w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerows(assignments_data)
+
+# ---- Helper Functions ---- #
+def calculate_gpa(grades):
+    grades = sorted(grades)[1:]  # Drop lowest grade
+    return round(sum(grades) / len(grades), 2)
+
+def calculate_attendance_percentage(records):
+    total = len(records)
+    present = records.count('present')
+    return round((present / total) * 100, 2) if total else 0
+
+def get_honors(gpa):
+    if gpa >= 3.9:
+        return "Summa Cum Laude"
+    elif gpa >= 3.75:
+        return "Magna Cum Laude"
+    elif gpa >= 3.5:
+        return "Cum Laude"
+    return "No honors"
+
+# ---- Load Data ---- #
+students = {}
+
+# Read grades.csv
+with open('grades.csv', newline='') as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        name = f"{row['First']} {row['Last']}"
+        try:
+            grades = [float(row[subj]) for subj in ['Math', 'English', 'History', 'Science']]
+            gpa = calculate_gpa(grades)
+            students[name] = {
+                'grades': grades,
+                'gpa': gpa
+            }
+        except ValueError:
+            print(f"Invalid grade values for {name}")
+
+# Read attendance.txt
+attendance_records = {}
+with open('attendance.txt') as file:
+    for line in file:
+        if ':' in line:
+            name, status = line.strip().split(':')
+            name, status = name.strip(), status.strip().lower()
+            if name not in attendance_records:
+                attendance_records[name] = []
+            attendance_records[name].append(status)
+
+# Calculate attendance and add to student data
+for name in students:
+    records = attendance_records.get(name, [])
+    percent = calculate_attendance_percentage(records)
+    students[name]['attendance'] = percent
+    students[name]['honors'] = get_honors(students[name]['gpa'])
+
+# ---- Ranking ---- #
+sorted_students = sorted(students.items(), key=lambda x: x[1]['gpa'], reverse=True)
+
+# Assign ranks
+for idx, (name, data) in enumerate(sorted_students):
+    data['rank'] = idx + 1
+
+# ---- Output Files ---- #
+os.makedirs('report_cards', exist_ok=True)
+
+with open('warning_list.txt', 'w') as warn_file, open('rankings.txt', 'w') as rank_file:
+    for name, data in sorted_students:
+        gpa = data['gpa']
+        attendance = data['attendance']
+        honors = data['honors']
+        grades = data['grades']
+        rank = data['rank']
+
+        # Report card
+        report = (
+            f"Name: {name}\n"
+            f"Grades: Math {grades[0]}, English {grades[1]}, History {grades[2]}, Science {grades[3]}\n"
+            f"GPA: {gpa}\n"
+            f"Attendance: {attendance}%\n"
+            f"Honors: {honors}\n"
+            f"Rank: {rank}\n"
+        )
+
+        with open(f'report_cards/{name.replace(" ", "_")}_report.txt', 'w') as f:
+            f.write(report)
+
+        # Ranking list
+        rank_file.write(f"{rank}. {name} - GPA: {gpa}\n")
+
+        # Warnings
+        if gpa < 1.5 or attendance < 75:
+            warn_file.write(f"{name} - GPA: {gpa}, Attendance: {attendance}%\n")
+
+print("✅ All report cards, lists, and files have been generated.")
+
+# ---- Interactive Part: User Input for Report Card ---- #
+def show_report_card():
+    print("\nEnter the full name of a student (e.g., 'Alexis Thoonkuzhy'): ")
+    student_name = input().strip()
+
+    if student_name in students:
+        data = students[student_name]
+        grades = data['grades']
+        gpa = data['gpa']
+        attendance = data['attendance']
+        honors = data['honors']
+        rank = data['rank']
+        
+        print(f"\n===== Report Card for {student_name} =====")
+        print(f"Grades: Math: {grades[0]}, English: {grades[1]}, History: {grades[2]}, Science: {grades[3]}")
+        print(f"GPA: {gpa}")
+        print(f"Attendance: {attendance}%")
+        print(f"Honors: {honors}")
+        print(f"Rank: {rank}")
+    else:
+        print("\nStudent not found. Please check the name and try again.")
+
+# Call the interactive function
+show_report_card()
